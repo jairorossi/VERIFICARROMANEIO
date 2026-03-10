@@ -21,10 +21,18 @@ def extrair_notas_pdf(pdf):
         for page in pdf_doc.pages:
             texto = page.extract_text()
 
-            encontrados = re.findall(r'\b4\d{5}\b', texto)
+            linhas = texto.split("\n")
 
-            for n in encontrados:
-                notas.add(n)
+            for linha in linhas:
+
+                partes = linha.split()
+
+                if len(partes) >= 3:
+
+                    possivel_nota = partes[-3]
+
+                    if possivel_nota.isdigit() and len(possivel_nota) == 6:
+                        notas.add(possivel_nota)
 
     return notas
 
