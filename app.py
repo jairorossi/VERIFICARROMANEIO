@@ -7,8 +7,9 @@ import re
 
 st.set_page_config(page_title="Comparador de Romaneio", layout="wide")
 
-st.title("📦 Comparador de Notas")
-st.write("Compare notas do **Romaneio (PDF)** com **XML das NF-e (ZIP)**")
+st.title("📦 Comparador de Notas - Romaneio x XML")
+st.write("Envie o **PDF do romaneio** e o **ZIP com os XML das NF-e**")
+
 
 pdf_file = st.file_uploader("Upload Romaneio (PDF)", type="pdf")
 zip_file = st.file_uploader("Upload XML (ZIP)", type="zip")
@@ -30,11 +31,14 @@ def extrair_notas_pdf(pdf):
             if not texto:
                 continue
 
-            # captura número de 6 dígitos antes do valor monetário
+            # captura número de 6 dígitos antes de valor monetário
             encontrados = re.findall(r'(\d{6})\s+\d+,\d{2}', texto)
 
             for nota in encontrados:
-                notas.add(nota)
+
+                nota_limpa = nota.strip().lstrip("0")
+
+                notas.add(nota_limpa)
 
     return notas
 
@@ -55,6 +59,7 @@ def extrair_notas_zip(zip_file):
                 with z.open(nome) as arquivo:
 
                     try:
+
                         tree = ET.parse(arquivo)
                         root = tree.getroot()
 
@@ -62,7 +67,9 @@ def extrair_notas_zip(zip_file):
 
                             if "nNF" in elem.tag:
 
-                                notas.add(elem.text)
+                                nota = elem.text.strip().lstrip("0")
+
+                                notas.add(nota)
 
                     except:
                         pass
@@ -123,7 +130,7 @@ if pdf_file and zip_file:
         st.write(lista_faltando)
 
     # -----------------------------
-    # DOWNLOAD
+    # DOWNLOAD RELATÓRIO
     # -----------------------------
     csv = df.to_csv(index=False).encode("utf-8")
 
@@ -133,3 +140,11 @@ if pdf_file and zip_file:
         "resultado_notas.csv",
         "text/csv"
     )
+
+    # -----------------------------
+    # DEBUG (opcional)
+    # -----------------------------
+    with st.expander("Debug (visualizar dados)"):
+
+        st.write("Notas do Romaneio (10 primeiras):", sorted(list(notas_romaneio))[:10])
+        st.write("Notas do XML (10 primeiras):", sorted(list(notas_xml))[:10])
