@@ -3,21 +3,22 @@ import pdfplumber
 import zipfile
 import xml.etree.ElementTree as ET
 import pandas as pd
-import re
 
-st.set_page_config(page_title="Comparador de Romaneio", layout="wide")
+st.set_page_config(page_title="Comparador Romaneio", layout="wide")
 
 st.title("📦 Comparador de Notas - Romaneio x XML")
-st.write("Envie o **PDF do romaneio** e o **ZIP com os XML das NF-e**")
+
+st.write(
+    "Envie o **PDF do romaneio** e o **ZIP contendo os XML das NF-e** para verificar quais notas estão faltando."
+)
+
+pdf_file = st.file_uploader("Upload do Romaneio (PDF)", type="pdf")
+zip_file = st.file_uploader("Upload dos XML (ZIP)", type="zip")
 
 
-pdf_file = st.file_uploader("Upload Romaneio (PDF)", type="pdf")
-zip_file = st.file_uploader("Upload XML (ZIP)", type="zip")
-
-
-# -----------------------------
-# Extrair notas do PDF
-# -----------------------------
+# -----------------------------------------
+# Extrair notas do ROMANEIO
+# -----------------------------------------
 def extrair_notas_pdf(pdf):
 
     notas = set()
@@ -31,21 +32,34 @@ def extrair_notas_pdf(pdf):
             if not texto:
                 continue
 
-            # captura número de 6 dígitos antes de valor monetário
-            encontrados = re.findall(r'(\d{6})\s+\d+,\d{2}', texto)
+            linhas = texto.split("\n")
 
-            for nota in encontrados:
+            for linha in linhas:
 
-                nota_limpa = nota.strip().lstrip("0")
+                linha = linha.strip()
 
-                notas.add(nota_limpa)
+                # Apenas linhas que começam com 001
+                if linha.startswith("001"):
+
+                    partes = linha.split()
+
+                    if len(partes) >= 4:
+
+                        # nota é o penúltimo campo
+                        nota = partes[-2]
+
+                        if nota.isdigit():
+
+                            nota = nota.lstrip("0")
+
+                            notas.add(nota)
 
     return notas
 
 
-# -----------------------------
-# Extrair notas do ZIP
-# -----------------------------
+# -----------------------------------------
+# Extrair notas do ZIP (XML)
+# -----------------------------------------
 def extrair_notas_zip(zip_file):
 
     notas = set()
@@ -77,9 +91,9 @@ def extrair_notas_zip(zip_file):
     return notas
 
 
-# -----------------------------
+# -----------------------------------------
 # PROCESSAMENTO
-# -----------------------------
+# -----------------------------------------
 if pdf_file and zip_file:
 
     with st.spinner("Processando arquivos..."):
@@ -100,9 +114,9 @@ if pdf_file and zip_file:
 
     st.success("Comparação concluída")
 
-    # -----------------------------
+    # -----------------------------------------
     # RESUMO
-    # -----------------------------
+    # -----------------------------------------
     st.subheader("Resumo")
 
     col1, col2, col3 = st.columns(3)
@@ -111,27 +125,29 @@ if pdf_file and zip_file:
     col2.metric("XML Encontrados", len(notas_xml))
     col3.metric("Faltando", len(faltando))
 
-    # -----------------------------
+    # -----------------------------------------
     # RESULTADO
-    # -----------------------------
+    # -----------------------------------------
     st.subheader("Resultado Completo")
 
     st.dataframe(df, use_container_width=True)
 
-    # -----------------------------
+    # -----------------------------------------
     # NOTAS FALTANDO
-    # -----------------------------
+    # -----------------------------------------
     if faltando:
 
         st.subheader("❌ Notas faltando no ZIP")
 
-        lista_faltando = sorted(list(faltando))
+        st.write(sorted(list(faltando)))
 
-        st.write(lista_faltando)
+    else:
 
-    # -----------------------------
+        st.success("Todas as notas do romaneio possuem XML.")
+
+    # -----------------------------------------
     # DOWNLOAD RELATÓRIO
-    # -----------------------------
+    # -----------------------------------------
     csv = df.to_csv(index=False).encode("utf-8")
 
     st.download_button(
@@ -141,10 +157,9 @@ if pdf_file and zip_file:
         "text/csv"
     )
 
-    # -----------------------------
+    # -----------------------------------------
     # DEBUG (opcional)
-    # -----------------------------
+    # -----------------------------------------
     with st.expander("Debug (visualizar dados)"):
-
-        st.write("Notas do Romaneio (10 primeiras):", sorted(list(notas_romaneio))[:10])
-        st.write("Notas do XML (10 primeiras):", sorted(list(notas_xml))[:10])
+        st.write("Primeiras notas do romaneio:", sorted(list(notas_romaneio))[:10])
+        st.write("Primeiras notas do XML:", sorted(list(notas_xml))[:10])
