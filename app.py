@@ -30,14 +30,11 @@ def extrair_notas_pdf(pdf):
             if not texto:
                 continue
 
-            # pega todos números de 6 dígitos
-            encontrados = re.findall(r"\b\d{6}\b", texto)
+            # captura número de 6 dígitos antes do valor monetário
+            encontrados = re.findall(r'(\d{6})\s+\d+,\d{2}', texto)
 
-            for numero in encontrados:
-
-                # filtro para evitar pegar códigos aleatórios
-                if numero.startswith("4"):
-                    notas.add(numero)
+            for nota in encontrados:
+                notas.add(nota)
 
     return notas
 
