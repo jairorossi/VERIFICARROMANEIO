@@ -1,0 +1,54 @@
+name: Playwright Keepalive
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Executa a cada 6 horas
+  workflow_dispatch:  # Permite executar manualmente
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install chromium --with-deps
+      
+      - name: Create keepalive script
+        run: |
+          cat > keepalive.py << 'EOF'
+          from playwright.sync_api import sync_playwright
+          import time
+
+          def wake_app(url):
+              with sync_playwright() as p:
+                  browser = p.chromium.launch(headless=True)
+                  page = browser.new_page()
+                  
+                  print(f"Acessando {url}...")
+                  page.goto(url, timeout=120000)
+                  time.sleep(5)
+                  
+                  # Verifica se tem botão de acordar
+                  wake_button = page.get_by_role("button", name="Yes, get this app back up!")
+                  if wake_button.count() > 0:
+                      print("App dormindo. Clicando para acordar...")
+                      wake_button.click()
+                      time.sleep(60)
+                      print("App acordado!")
+                  else:
+                      print("App já está ativo!")
+                  
+                  browser.close()
+
+          # ⚠️ SUBSTITUA PELA URL DO SEU APP ⚠️
+          wake_app("https://verificarromaneio-792uiujwkbx4hcqu4r2yfn.streamlit.app/")
+          EOF
+      
+      - name: Run keepalive
+        run: python keepalive.py
