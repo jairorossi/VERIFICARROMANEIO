@@ -4,58 +4,78 @@ import zipfile
 import xml.etree.ElementTree as ET
 import pandas as pd
 import re
-import io
 
-st.title("📦 Comparador de Notas - Romaneio x XML")
+st.set_page_config(page_title="Comparador de Romaneio", layout="wide")
 
-st.write("Envie o **PDF do romaneio** e o **ZIP com os XML das NF-e**")
+st.title("📦 Comparador de Notas")
+st.write("Compare notas do **Romaneio (PDF)** com **XML das NF-e (ZIP)**")
 
 pdf_file = st.file_uploader("Upload Romaneio (PDF)", type="pdf")
 zip_file = st.file_uploader("Upload XML (ZIP)", type="zip")
 
 
+# -----------------------------
+# Extrair notas do PDF
+# -----------------------------
 def extrair_notas_pdf(pdf):
+
     notas = set()
 
     with pdfplumber.open(pdf) as pdf_doc:
+
         for page in pdf_doc.pages:
+
             texto = page.extract_text()
 
-            linhas = texto.split("\n")
+            if not texto:
+                continue
 
-            for linha in linhas:
+            # pega todos números de 6 dígitos
+            encontrados = re.findall(r"\b\d{6}\b", texto)
 
-                partes = linha.split()
+            for numero in encontrados:
 
-                if len(partes) >= 3:
-
-                    possivel_nota = partes[-3]
-
-                    if possivel_nota.isdigit() and len(possivel_nota) == 6:
-                        notas.add(possivel_nota)
+                # filtro para evitar pegar códigos aleatórios
+                if numero.startswith("4"):
+                    notas.add(numero)
 
     return notas
 
 
+# -----------------------------
+# Extrair notas do ZIP
+# -----------------------------
 def extrair_notas_zip(zip_file):
+
     notas = set()
 
     with zipfile.ZipFile(zip_file) as z:
+
         for nome in z.namelist():
 
-            if nome.endswith(".xml"):
+            if nome.lower().endswith(".xml"):
 
                 with z.open(nome) as arquivo:
-                    tree = ET.parse(arquivo)
-                    root = tree.getroot()
 
-                    for elem in root.iter():
-                        if "nNF" in elem.tag:
-                            notas.add(elem.text)
+                    try:
+                        tree = ET.parse(arquivo)
+                        root = tree.getroot()
+
+                        for elem in root.iter():
+
+                            if "nNF" in elem.tag:
+
+                                notas.add(elem.text)
+
+                    except:
+                        pass
 
     return notas
 
 
+# -----------------------------
+# PROCESSAMENTO
+# -----------------------------
 if pdf_file and zip_file:
 
     with st.spinner("Processando arquivos..."):
@@ -64,10 +84,10 @@ if pdf_file and zip_file:
         notas_xml = extrair_notas_zip(zip_file)
 
         faltando = notas_romaneio - notas_xml
-        ok = notas_romaneio.intersection(notas_xml)
+        encontradas = notas_romaneio.intersection(notas_xml)
 
         df = pd.DataFrame({
-            "Nota": list(notas_romaneio),
+            "Nota": sorted(list(notas_romaneio))
         })
 
         df["Status"] = df["Nota"].apply(
@@ -76,6 +96,9 @@ if pdf_file and zip_file:
 
     st.success("Comparação concluída")
 
+    # -----------------------------
+    # RESUMO
+    # -----------------------------
     st.subheader("Resumo")
 
     col1, col2, col3 = st.columns(3)
@@ -84,14 +107,27 @@ if pdf_file and zip_file:
     col2.metric("XML Encontrados", len(notas_xml))
     col3.metric("Faltando", len(faltando))
 
-    st.subheader("Resultado")
+    # -----------------------------
+    # RESULTADO
+    # -----------------------------
+    st.subheader("Resultado Completo")
 
-    st.dataframe(df)
+    st.dataframe(df, use_container_width=True)
 
+    # -----------------------------
+    # NOTAS FALTANDO
+    # -----------------------------
     if faltando:
-        st.error("Notas faltando no ZIP:")
-        st.write(sorted(list(faltando)))
 
+        st.subheader("❌ Notas faltando no ZIP")
+
+        lista_faltando = sorted(list(faltando))
+
+        st.write(lista_faltando)
+
+    # -----------------------------
+    # DOWNLOAD
+    # -----------------------------
     csv = df.to_csv(index=False).encode("utf-8")
 
     st.download_button(
